@@ -1,0 +1,9 @@
+../Core/Src/BaseSystem.c:31:6:easyCase	1
+../Core/Src/BaseSystem.c:37:6:Heartbeat	1
+../Core/Src/BaseSystem.c:41:6:Routine	2
+../Core/Src/BaseSystem.c:54:6:Vacuum	3
+../Core/Src/BaseSystem.c:68:6:GripperMovement	3
+../Core/Src/BaseSystem.c:83:6:SetShelves	6
+../Core/Src/BaseSystem.c:112:6:RunPoint	2
+../Core/Src/BaseSystem.c:127:6:SetHome	2
+../Core/Src/BaseSystem.c:141:6:RunJog	8

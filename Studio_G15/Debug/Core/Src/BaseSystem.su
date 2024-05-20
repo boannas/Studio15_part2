@@ -1,0 +1,9 @@
+../Core/Src/BaseSystem.c:31:6:easyCase	4	static
+../Core/Src/BaseSystem.c:37:6:Heartbeat	4	static
+../Core/Src/BaseSystem.c:41:6:Routine	8	static
+../Core/Src/BaseSystem.c:54:6:Vacuum	8	static
+../Core/Src/BaseSystem.c:68:6:GripperMovement	8	static
+../Core/Src/BaseSystem.c:83:6:SetShelves	8	static
+../Core/Src/BaseSystem.c:112:6:RunPoint	8	static
+../Core/Src/BaseSystem.c:127:6:SetHome	8	static
+../Core/Src/BaseSystem.c:141:6:RunJog	16	static

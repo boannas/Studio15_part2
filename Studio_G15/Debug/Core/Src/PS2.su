@@ -1,0 +1,4 @@
+../Core/Src/PS2.c:32:6:PS2_init	16	static
+../Core/Src/PS2.c:50:6:PS2X_Reader	24	static
+../Core/Src/PS2.c:150:6:handle_shelve_mode	16	static
+../Core/Src/PS2.c:178:6:handle_PIDPos_adjustment	16	static
