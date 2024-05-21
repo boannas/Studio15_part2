@@ -83,6 +83,7 @@ float elapsedTime = 0.0f;			// Total elapsed time in seconds
 float i = 0;
 u16u8_t registerFrame[200];
 int ppp = 0;
+extern float temp_pos;
 
 // Function here!
 uint64_t micros();
@@ -165,8 +166,8 @@ int main(void)
   hmodbus.RegisterSize =200;
   Modbus_init(&hmodbus, registerFrame);
 
-  float PID_pos_K[3] = {17 ,0.0026, 0.0001};
-    float PID_velo_K[3] = {7.0 ,0.00002, 0.0};
+  float PID_pos_K[3] = {17 ,0.0028, 0.0001};
+    float PID_velo_K[3] = {7.0 ,0.00002, 0.000001};
 
 
   // Velocity 450 mm/s
@@ -174,7 +175,7 @@ int main(void)
 //  float PID_velo_K[3] = {9 ,0.00002, 0.0};
 
   // Initialize ASRS
-  Traject_init(&Traj,550, 500);				// V_max, A_max
+  Traject_init(&Traj,550, 600);				// V_max, A_max
 //  Kalman_Start(&Vel_filtered);
   AMT_encoder_init(&AMT, &htim2);
   MOTOR_init(&MT, &htim3,TIM_CHANNEL_2, TIM_CHANNEL_1);
@@ -195,22 +196,11 @@ int main(void)
 	  static uint64_t timestamps =0;
 	  if(HAL_GetTick() > timestamps)
 	  {
-		  timestamps =HAL_GetTick() + 50;		//ms
+		  timestamps =HAL_GetTick() + 100;		//ms
 	  	  Heartbeat();
 	  }
 
-
-//	   Read AMT encoder 1000 Hz
-//	  static uint64_t timestamp =0;
-//	  int64_t currentTime = HAL_GetTick();
-//	  if(currentTime > timestamp)
-//	  {
-//	  timestamp =currentTime + 1;				//ms
-//	  AMT_encoder_update(&AMT, &htim2, micros());
-//	  }
-
-
-
+	  // UI & Gripper
 	  Vacuum();
 	  GripperMovement();
 	  Modbus_Protocal_Worker();
@@ -367,11 +357,11 @@ static void MX_TIM2_Init(void)
   sConfig.IC1Polarity = TIM_ICPOLARITY_RISING;
   sConfig.IC1Selection = TIM_ICSELECTION_DIRECTTI;
   sConfig.IC1Prescaler = TIM_ICPSC_DIV1;
-  sConfig.IC1Filter = 0;
+  sConfig.IC1Filter = 3;
   sConfig.IC2Polarity = TIM_ICPOLARITY_RISING;
   sConfig.IC2Selection = TIM_ICSELECTION_DIRECTTI;
   sConfig.IC2Prescaler = TIM_ICPSC_DIV1;
-  sConfig.IC2Filter = 0;
+  sConfig.IC2Filter = 3;
   if (HAL_TIM_Encoder_Init(&htim2, &sConfig) != HAL_OK)
   {
     Error_Handler();
@@ -829,6 +819,14 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
 			    AMT_encoder_update(&AMT, &htim2, micros());
 
+			}
+
+
+
+			// For 5 KHz
+			//----------------For PID & Traj Condition----------------//
+			if(interrupt_counter % 4 == 0)
+			{
 				//Modbus
 				easyCase();
 				switch(base.Base_case){
@@ -844,11 +842,13 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 						RunJog();
 						break;
 					case 8:
-						base.BaseStatus = 8;
+						base.BaseStatus = 16;
 						RunPoint();
 						break;
 					default :
 						base.BaseStatus = 0;
+						Holding_position();
+
 				}
 
 				// Reed Switch Status
@@ -863,22 +863,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 					default:
 						base.ReedStatus = 0b0000;
 				}
-//				elapsedTime += 0.0001;					// Calibrate Time
 
-			}
-
-
-
-			// For 5 KHz
-			//----------------For PID & Trajectory----------------//
-			if(interrupt_counter % 4 == 0)
-			{
-				if(ppp == 1){
-					elapsedTime += 0.0002;
-					Traject(&Traj, 600, 100);
-					PID_controller_cascade(&PID_pos, &PID_velo, &AMT, Traj.currentPosition);
-					base.MotorHome = PID_velo.out;
-				}
 				// Coarse Step Joy
 				if (ps2.mode == 1){
 					base.MotorHome = ps2.pwmOut;
@@ -897,26 +882,16 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
 
 
-
-
 			// For 2 kHz
 			//------------------For control PWM-------------------//
 			if(interrupt_counter % 10 == 0)
 			{
 
 //				elapsedTime += 0.0005;					//Calibrated Time
-//				if (base.BaseStatus == 2){
-//					MOTOR_set_duty(&MT, base.MotorHome);
-//				}
-//				else {
-//					MOTOR_set_duty(&MT, base.MotorHome);
-//			}
-//
-//}
 
 				MOTOR_set_duty(&MT, base.MotorHome);
 			}
-	}
+		}
 	}
 
 uint64_t micros()

@@ -138,8 +138,8 @@ void AMT_encoder_update(AMT_Encoder *AMT_data, TIM_HandleTypeDef *Encoder_timer,
 //    float Vin = base.MotorHome * 24.0 / 1000;
     AMT_data->Linear_Position += position_change_mm; // mm
     AMT_data->Linear_Velocity = kalman_filter((AMT_data->Angular_Velocity / 60.0f * pulley_cir)); // mm/s
-//    AMT_data->Linear_kalmanVelocity = kalman_filter(AMT_data->Linear_Velocity);
     AMT_data->Linear_Velo[QEI_NOW] = AMT_data->Linear_Velocity; // Update Velo
+//    AMT_data->Linear_Acceleration = (AMT_data->Linear_Velo[QEI_NOW]-AMT_data->Linear_Velo[QEI_PREV])/(time_seconds);
 
     // Store value for next loop
     AMT_data->Position[QEI_PREV] = AMT_data->Position[QEI_NOW];

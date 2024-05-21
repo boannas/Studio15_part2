@@ -21,6 +21,7 @@ extern float elapsedTime;
 int fuCount = 0;
 extern PID_struct PID_velo, PID_pos;
 extern PS2_typedef ps2;
+float temp_pos;
 //-------------------------------------------Function Code-------------------------------------------------------//
 
 //void Reset(){  	Didn't use for now
@@ -111,14 +112,17 @@ void SetShelves(){
 
 void RunPoint(){
 	base.GoalPoint = (registerFrame[0x30].U16)/10; //Get Goal point from BaseSytem(Point Mode) that we pick/write After pressing Run Button
-//	registerFrame[0x01].U16 = 8;
-//	PID_controller_cascade(&PID_pos, &PID_velo, &AMT, Traj.currentPosition);
-//	base.MotorHome = PID_velo.out;
-	// Task Done
+	elapsedTime += 0.0002;
+	Traject(&Traj, temp_pos, base.GoalPoint);
+	PID_controller_cascade(&PID_pos, &PID_velo, &AMT, Traj.currentPosition);
+	base.MotorHome = PID_velo.out;
+
+	// Error must less than 0.1 mm
 	if(fabs(AMT.Linear_Position - base.GoalPoint) <= 0.1){
 		elapsedTime = 0;
+		Traj.currentPosition = base.GoalPoint;
+		temp_pos = base.GoalPoint;
 		base.BaseStatus = 0;
-		base.MotorHome = 150;
 		registerFrame[0x01].U16 = 0;
 		registerFrame[0x10].U16 = base.BaseStatus;
 	}
@@ -126,59 +130,70 @@ void RunPoint(){
 
 void SetHome(){
 	//	registerFrame[0x01].U16 = 2;
-	base.MotorHome = 350;		// Set duty cycle to go upward at slowest speed
+	Traj.currentPosition = 600;
+	base.MotorHome = 310;		// Set duty cycle to go upward at slowest speed
 	if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_6) == GPIO_PIN_SET)		// Top photo limit was triggered
 	{
-		base.BaseStatus = 0;
-		base.MotorHome = 150;		// Set duty cycle to hold position gripper
+//		base.MotorHome = 150;		// Set duty cycle to hold position gripper
 		AMT_encoder_reset(&AMT);	// Set linear position to ...
+		temp_pos = AMT.Linear_Position;
+
+		base.BaseStatus = 0;
 		registerFrame[0x01].U16 = 0;
 		registerFrame[0x10].U16 = base.BaseStatus;
-
 	}
 }
 
 void RunJog(){
-//	base.Pick[0] = registerFrame[0x21].U16 ; 	//Get Pick from BaseSystem
+
 	registerFrame[0x10].U16 = 4;
+
+	// Define Pick shelf
 	base.Pick[4] = registerFrame[0x21].U16 % 10;
 	base.Pick[3] = ((registerFrame[0x21].U16 - base.Pick[4]) % 100)/10;
 	base.Pick[2] = ((registerFrame[0x21].U16 %1000) - ((base.Pick[3]*10)+base.Pick[4]))/100;
 	base.Pick[1] = ((registerFrame[0x21].U16 %10000)-(((base.Pick[2]*100)+(base.Pick[3]*10)+base.Pick[4])))/1000;
 	base.Pick[0] = (registerFrame[0x21].U16-((base.Pick[1]*1000+base.Pick[2]*100+base.Pick[3]*10+base.Pick[4])))/10000;
-
+	// Define Place shelf
 	base.Place[4] = registerFrame[0x22].U16 % 10;
 	base.Place[3] = ((registerFrame[0x22].U16 - base.Place[4]) % 100)/10;
 	base.Place[2] = ((registerFrame[0x22].U16 %1000) - ((base.Place[3]*10)+base.Place[4]))/100;
 	base.Place[1] = ((registerFrame[0x22].U16 %10000)-(((base.Place[2]*100)+(base.Place[3]*10)+base.Place[4])))/1000;
 	base.Place[0] = (registerFrame[0x22].U16-((base.Place[1]*1000+base.Place[2]*100+base.Place[3]*10+base.Place[4])))/10000;
 
-//	base.Place = registerFrame[0x22].U16 ;	//Get Place from BaseSystem
-	if (registerFrame[0x10].U16 == 4)
-	{
-		elapsedTime += 0.0002;
-		Traject(&Traj, AMT.Linear_Position, base.Pick[fuCount]);
-		PID_controller_cascade(&PID_pos, &PID_velo, &AMT, Traj.currentPosition);
-		if (Traj.currentVelocity == 0 & fabs(AMT.Linear_Position-Traj.currentPosition) < 0.05)
-		{
-			registerFrame[0x10].U16 = 8;
-			PID_pos.out = 0;
-		}
+
+	// Condition for Pick and Place
+	switch(registerFrame[0x10].U16){
+		// Pick Case
+		case(4):
+			elapsedTime += 0.0002;
+			Traject(&Traj, AMT.Linear_Position, base.Pick[fuCount]);
+			PID_controller_cascade(&PID_pos, &PID_velo, &AMT, Traj.currentPosition);
+			if (fabs(AMT.Linear_Position - base.Pick[fuCount]) < 0.2)
+			{
+				registerFrame[0x10].U16 = 8;
+				elapsedTime = 0;
+			}
+
+		// Place Case
+		case(8):
+
+			elapsedTime += 0.0002;
+			Traject(&Traj, AMT.Linear_Position, base.Place[fuCount]);
+			PID_controller_cascade(&PID_pos, &PID_velo, &AMT, Traj.currentPosition);
+			if (fabs(AMT.Linear_Position - base.Place[fuCount]) < 0.2)
+			{
+				base.BaseStatus = 0;
+				registerFrame[0x01].U16 = base.BaseStatus;
+				registerFrame[0x10].U16 = 0;
+				elapsedTime = 0;
+//				base.sp = 0;
+//				PID_pos.out = 0;
+			}
+
 	}
-	else if (registerFrame[0x10].U16 == 8)
-	{
-		elapsedTime += 0.0002;
-		Traject(&Traj, AMT.Linear_Position, base.Place[fuCount]);
-		PID_controller_cascade(&PID_pos, &PID_velo, &AMT, Traj.currentPosition);
-		if (Traj.currentVelocity == 0 & fabs(AMT.Linear_Position-Traj.currentPosition) < 0.05)
-		{
-			base.BaseStatus = 0;
-			registerFrame[0x01].U16 = base.BaseStatus;
-			registerFrame[0x10].U16 = 0;
-			base.sp = 0;
-			PID_pos.out = 0;
-		}
-	}
+
+
 
 	//pick place 5 time
 	if(base.sp == 1){
@@ -187,4 +202,12 @@ void RunJog(){
 		registerFrame[0x10].U16 = 0;
 		base.sp = 0;
 	}
+}
+
+void Holding_position()
+{
+	PID_controller_cascade(&PID_pos, &PID_velo, &AMT, Traj.currentPosition);
+	base.MotorHome = PID_velo.out;
+	temp_pos = AMT.Linear_Position;
+
 }
