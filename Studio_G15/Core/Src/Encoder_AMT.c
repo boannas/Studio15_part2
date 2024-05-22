@@ -34,8 +34,8 @@ long kalman_filter(long ADC_Value)
     float Z_k;
     static float P_k1_k1;
 
-    static float Q = 0.0001;//Q: Regulation noise, Q increases, dynamic response becomes faster, and convergence stability becomes worse
-    static float R = 0.8; //R: Test noise, R increases, dynamic response becomes slower, convergence stability becomes better
+    static float Q = 0.0005;//Q: Regulation noise, Q increases, dynamic response becomes faster, and convergence stability becomes worse
+    static float R = 0.9; //R: Test noise, R increases, dynamic response becomes slower, convergence stability becomes better
     static float Kg = 0;
     static float P_k_k1 = 1;
 

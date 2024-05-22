@@ -166,8 +166,8 @@ int main(void)
   hmodbus.RegisterSize =200;
   Modbus_init(&hmodbus, registerFrame);
 
-  float PID_pos_K[3] = {17 ,0.0028, 0.0001};
-    float PID_velo_K[3] = {7.0 ,0.00002, 0.000001};
+  float PID_pos_K[3] = {12 ,0.003, 0.0001};
+  float PID_velo_K[3] = {7.0 ,0.0022, 0.0001};
 
 
   // Velocity 450 mm/s
@@ -812,9 +812,9 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
 
 
-			// For 10 kHz
+			// For 1 kHz
 			//-------For AMT Encoder & Base Status check----------//
-			if(interrupt_counter % 2 == 0)
+			if(interrupt_counter % 20 == 0)
 			{
 
 			    AMT_encoder_update(&AMT, &htim2, micros());

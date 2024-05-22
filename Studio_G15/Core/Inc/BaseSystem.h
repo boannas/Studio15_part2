@@ -59,6 +59,7 @@ extern void RunPoint();
 extern void SetHome();
 extern void RunJog();
 extern void Holding_position();
+extern void Holding_Sethome();
 
 #endif /* INC_BASESYSTEM_H_ */
 

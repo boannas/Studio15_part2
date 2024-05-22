@@ -130,14 +130,14 @@ void RunPoint(){
 
 void SetHome(){
 	//	registerFrame[0x01].U16 = 2;
-	Traj.currentPosition = 600;
 	base.MotorHome = 310;		// Set duty cycle to go upward at slowest speed
+	temp_pos = 600;
 	if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_6) == GPIO_PIN_SET)		// Top photo limit was triggered
 	{
 //		base.MotorHome = 150;		// Set duty cycle to hold position gripper
 		AMT_encoder_reset(&AMT);	// Set linear position to ...
-		temp_pos = AMT.Linear_Position;
-
+		Traj.currentPosition = 300;
+//		PID_velo.out = 300;
 		base.BaseStatus = 0;
 		registerFrame[0x01].U16 = 0;
 		registerFrame[0x10].U16 = base.BaseStatus;
