@@ -24,7 +24,7 @@
 #include "arm_math.h"
 #include "ModBusRTU.h"
 #include "BaseSystem.h"
-#include "kalman.h"
+#include "Kalman.h"
 #include "Encoder.h"
 #include "Motor.h"
 #include "PID_controller.h"
@@ -72,9 +72,10 @@ AMT_Encoder AMT;
 PS2_typedef ps2;
 extern PID_struct PID_pos;
 PID_struct PID_velo;
-extern KalmanFilter Vel_filtered;
 extern BaseStruct base;
 ModbusHandleTypedef hmodbus;
+KalmanState filtered_velo;
+KalmanState filtered_accel;
 
 // Define some variables
 uint64_t _micros;					// Microsecond
@@ -82,8 +83,9 @@ uint8_t fixps2[10];
 float elapsedTime = 0.0f;			// Total elapsed time in seconds
 float i = 0;
 u16u8_t registerFrame[200];
-int ppp = 0;
+int emer = 0;
 extern float temp_pos;
+
 
 // Function here!
 uint64_t micros();
@@ -166,7 +168,7 @@ int main(void)
   hmodbus.RegisterSize =200;
   Modbus_init(&hmodbus, registerFrame);
 
-  float PID_pos_K[3] = {12 ,0.003, 0.0001};
+  float PID_pos_K[3] = {12 ,0.002, 0.001};
   float PID_velo_K[3] = {7.0 ,0.0022, 0.0001};
 
 
@@ -181,6 +183,8 @@ int main(void)
   MOTOR_init(&MT, &htim3,TIM_CHANNEL_2, TIM_CHANNEL_1);
   PID_controller_init(&PID_pos,PID_pos_K[0],PID_pos_K[1],PID_pos_K[2]);
   PID_controller_init(&PID_velo,PID_velo_K[0],PID_velo_K[1],PID_velo_K[3]);
+  kalman_filter_init(&filtered_velo, 0.001,0.6);
+  kalman_filter_init(&filtered_accel, 0.002,0.2);
 
   /* USER CODE END 2 */
 
@@ -194,7 +198,7 @@ int main(void)
 
 	  // Feedback to base system 5 Hz
 	  static uint64_t timestamps =0;
-	  if(HAL_GetTick() > timestamps)
+	  if(HAL_GetTick() > timestamps & emer == 0 )
 	  {
 		  timestamps =HAL_GetTick() + 100;		//ms
 	  	  Heartbeat();
@@ -210,6 +214,16 @@ int main(void)
 	  HAL_UART_Receive(&huart4,ps2.ps2RX, 10 ,10);
 	  if (base.BaseStatus == 1){
 		  SetShelves();
+	  }
+
+	  if (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_7) == GPIO_PIN_SET)		// Top photo limit was triggered
+	  	{
+		  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, 1);
+		  emer = 1;
+	  	}
+	  else
+	  {
+		  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, 0);
 	  }
   }
   /* USER CODE END 3 */
@@ -806,11 +820,6 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
 
 			// For 20 kHz
-			//------------------For AMT Encoder-------------------//
-
-//			elapsedTime += 0.00005;						// Calibrate Time
-
-
 
 			// For 1 kHz
 			//-------For AMT Encoder & Base Status check----------//
@@ -825,7 +834,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
 			// For 5 KHz
 			//----------------For PID & Traj Condition----------------//
-			if(interrupt_counter % 4 == 0)
+			if(interrupt_counter % 4 == 0 & emer == 0)
 			{
 				//Modbus
 				easyCase();
@@ -838,7 +847,12 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 						SetHome();
 						break;
 					case 4:
-						base.BaseStatus = 4;
+						if(base.runJogMode == 0){
+							base.BaseStatus = 4;
+						}
+						else if(base.runJogMode == 1){
+							base.BaseStatus = 8;
+						}
 						RunJog();
 						break;
 					case 8:
@@ -865,7 +879,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 				}
 
 				// Coarse Step Joy
-				if (ps2.mode == 1){
+				if (ps2.mode == 1 & emer == 0){
 					base.MotorHome = ps2.pwmOut;
 					if (ps2.pwmOut < 0)
 					{
@@ -874,7 +888,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 				}
 
 				// Fine Step Joy
-				if (ps2.mode == 2){
+				if (ps2.mode == 2 & emer == 0){
 					PID_controller_cascade(&PID_pos, &PID_velo, &AMT, ps2.PIDPos);
 					base.MotorHome = PID_velo.out;
 				}
@@ -884,11 +898,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
 			// For 2 kHz
 			//------------------For control PWM-------------------//
-			if(interrupt_counter % 10 == 0)
+			if(interrupt_counter % 10 == 0 & emer == 0)
 			{
-
-//				elapsedTime += 0.0005;					//Calibrated Time
-
 				MOTOR_set_duty(&MT, base.MotorHome);
 			}
 		}

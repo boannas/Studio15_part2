@@ -17,7 +17,7 @@ extern u16u8_t registerFrame[200];
 
 // Define variable inside library
 int num[10]= {48,49,50,51,52,53,54,55,56,57};
-int count = 1;
+int count = 0;
 
 // Function Prototypes
 void PS2_init(PS2_typedef* PS2);
@@ -156,14 +156,14 @@ void handle_shelve_mode()
         if (ps2.ps2RX[0] == 76 && current_time > debounce_time)
         {
             // Press Select to save shelve
-            base.Shelve[(count - 1) / 2] = AMT.Linear_Position;
+            base.Shelve[count] = AMT.Linear_Position;
             count += 1;
             debounce_time = current_time + 250; // Debounce delay of 250ms
         }
         else if (ps2.ps2RX[0] == 73 && current_time > debounce_time)
         {
             // Press Triangle to delete old array
-            base.Shelve[((count - 1) / 2) - 1] = 0;
+            base.Shelve[count - 1] = 0;
             count -= 1;
             debounce_time = current_time + 250; // Debounce delay of 250ms
         }

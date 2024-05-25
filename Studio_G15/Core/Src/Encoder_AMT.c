@@ -8,12 +8,13 @@
 // Include Library here !
 #include "Encoder.h"
 #include "main.h"
-#include "kalman.h"
+#include "Kalman.h"
 #include "PID_controller.h"
 
 // Import variable from other .c file
-KalmanFilter Vel_filtered;
 extern PID_struct PID_velo;
+extern KalmanState filtered_velo;
+extern KalmanState filtered_accel;
 
 // Define variable inside library
 int32_t diffPosition;
@@ -21,43 +22,45 @@ uint32_t cnt_per_rev = 8192;
 float cnt_per_rev_f = 8192.0;
 float pulley_cir = 2.0*(22.0/7.0)*12.5;				// millimeter
 float diffTime;
+float diffTimeAcc;
 float ALPHA = 0.3f;									// smoothing param
 const float cnt_per_rev_inv = 1.0f / 8192.0 ;
 const float one_million_inv = 1e-6f;
 
+
 //-------------------------------------------Function Code-------------------------------------------------------//
-
-long kalman_filter(long ADC_Value)
-{
-    float x_k1_k1,x_k_k1;
-    static float ADC_OLD_Value;
-    float Z_k;
-    static float P_k1_k1;
-
-    static float Q = 0.0005;//Q: Regulation noise, Q increases, dynamic response becomes faster, and convergence stability becomes worse
-    static float R = 0.9; //R: Test noise, R increases, dynamic response becomes slower, convergence stability becomes better
-    static float Kg = 0;
-    static float P_k_k1 = 1;
-
-    float kalman_adc;
-    static float kalman_adc_old=0;
-    Z_k = ADC_Value;
-    x_k1_k1 = kalman_adc_old;
-
-    x_k_k1 = x_k1_k1;
-    P_k_k1 = P_k1_k1 + Q;
-
-    Kg = P_k_k1/(P_k_k1 + R);
-
-    kalman_adc = x_k_k1 + Kg * (Z_k - kalman_adc_old);
-    P_k1_k1 = (1 - Kg)*P_k_k1;
-    P_k_k1 = P_k1_k1;
-
-    ADC_OLD_Value = ADC_Value;
-    kalman_adc_old = kalman_adc;
-
-    return kalman_adc;
-}
+//
+//long kalman_filter(long ADC_Value)
+//{
+//    float x_k1_k1,x_k_k1;
+//    static float ADC_OLD_Value;
+//    float Z_k;
+//    static float P_k1_k1;
+//
+//    static float Q = 0.0005;//Q: Regulation noise, Q increases, dynamic response becomes faster, and convergence stability becomes worse
+//    static float R = 0.9; //R: Test noise, R increases, dynamic response becomes slower, convergence stability becomes better
+//    static float Kg = 0;
+//    static float P_k_k1 = 1;
+//
+//    float kalman_adc;
+//    static float kalman_adc_old=0;
+//    Z_k = ADC_Value;
+//    x_k1_k1 = kalman_adc_old;
+//
+//    x_k_k1 = x_k1_k1;
+//    P_k_k1 = P_k1_k1 + Q;
+//
+//    Kg = P_k_k1/(P_k_k1 + R);
+//
+//    kalman_adc = x_k_k1 + Kg * (Z_k - kalman_adc_old);
+//    P_k1_k1 = (1 - Kg)*P_k_k1;
+//    P_k_k1 = P_k1_k1;
+//
+//    ADC_OLD_Value = ADC_Value;
+//    kalman_adc_old = kalman_adc;
+//
+//    return kalman_adc;
+//}
 
 
 void AMT_encoder_init(AMT_Encoder *AMT_data,TIM_HandleTypeDef *Encoder_timer)
@@ -135,16 +138,24 @@ void AMT_encoder_update(AMT_Encoder *AMT_data, TIM_HandleTypeDef *Encoder_timer,
 
     // Calculate linear position and velocity
     float position_change_mm = (diffPosition * pulley_cir) * cnt_per_rev_inv;
-//    float Vin = base.MotorHome * 24.0 / 1000;
     AMT_data->Linear_Position += position_change_mm; // mm
-    AMT_data->Linear_Velocity = kalman_filter((AMT_data->Angular_Velocity / 60.0f * pulley_cir)); // mm/s
+    AMT_data->Linear_Velocity = kalman_filter(&filtered_velo,(AMT_data->Angular_Velocity / 60.0f * pulley_cir)); // mm/s
     AMT_data->Linear_Velo[QEI_NOW] = AMT_data->Linear_Velocity; // Update Velo
-//    AMT_data->Linear_Acceleration = (AMT_data->Linear_Velo[QEI_NOW]-AMT_data->Linear_Velo[QEI_PREV])/(time_seconds);
+    static uint64_t accel_timestamp = 0;
+	AMT_data->Accel_TimeStamp[QEI_NOW] = micros();
+	if(AMT_data->Accel_TimeStamp[QEI_NOW] >= accel_timestamp)
+	{
+		accel_timestamp = AMT_data->Accel_TimeStamp[QEI_NOW] + 10000;//us
+		diffTimeAcc = (AMT_data->Accel_TimeStamp[QEI_NOW] - AMT_data->Accel_TimeStamp[QEI_PREV]) * 0.000001;
 
+		double accel = (AMT_data->Linear_Velo[QEI_NOW] - AMT_data->Linear_Velo[QEI_PREV]) / diffTimeAcc;
+		AMT_data->Linear_Acceleration = kalman_filter(&filtered_accel, accel);
+		AMT_data->Linear_Velo[QEI_PREV] = AMT_data->Linear_Velo[QEI_NOW];
+		AMT_data->Accel_TimeStamp[QEI_PREV] = AMT_data->Accel_TimeStamp[QEI_NOW];
+	}
     // Store value for next loop
     AMT_data->Position[QEI_PREV] = AMT_data->Position[QEI_NOW];
     AMT_data->TimeStamp[QEI_PREV] = AMT_data->TimeStamp[QEI_NOW];
-    AMT_data->Linear_Velo[QEI_PREV] = AMT_data->Linear_Velo[QEI_NOW];
 }
 
 

@@ -27,6 +27,7 @@ typedef struct{
 	float Shelve[5];
 //	uint16_t PointMode;
 	float GoalPoint;
+	int runJogMode;
 	uint16_t Pick[5];
 	uint16_t Place[5];
 	uint16_t Base_case;	//bs

@@ -14,6 +14,7 @@ typedef struct
 		// for record New / Old value to calculate dx / dt
 		uint32_t Position[2];
 		uint64_t TimeStamp[2];
+		uint64_t Accel_TimeStamp[2];
 		float Linear_Velo[2];
 		int QEIPostion_1turn;
 		float Angular_Velocity;			//RPM

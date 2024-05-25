@@ -63,7 +63,7 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
  ../Middlewares/Third_Party/ARM_CMSIS/Include/dsp/support_functions.h \
  ../Middlewares/Third_Party/ARM_CMSIS/Include/dsp/quaternion_math_functions.h \
  ../Middlewares/Third_Party/ARM_CMSIS/Include/dsp/window_functions.h \
- ../Core/Inc/ModBusRTU.h ../Core/Inc/BaseSystem.h ../Core/Inc/kalman.h \
+ ../Core/Inc/ModBusRTU.h ../Core/Inc/BaseSystem.h ../Core/Inc/Kalman.h \
  ../Core/Inc/main.h ../Core/Inc/Encoder.h ../Core/Inc/Motor.h \
  ../Core/Inc/PID_controller.h ../Core/Inc/Encoder.h \
  ../Core/Inc/Trapezoidal.h ../Core/Inc/PS2.h
@@ -134,7 +134,7 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
 ../Middlewares/Third_Party/ARM_CMSIS/Include/dsp/window_functions.h:
 ../Core/Inc/ModBusRTU.h:
 ../Core/Inc/BaseSystem.h:
-../Core/Inc/kalman.h:
+../Core/Inc/Kalman.h:
 ../Core/Inc/main.h:
 ../Core/Inc/Encoder.h:
 ../Core/Inc/Motor.h:
