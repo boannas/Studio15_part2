@@ -177,13 +177,13 @@ int main(void)
 //  float PID_velo_K[3] = {9 ,0.00002, 0.0};
 
   // Initialize ASRS
-  Traject_init(&Traj,550, 600);				// V_max, A_max
+  Traject_init(&Traj,550, 700);				// V_max, A_max
 //  Kalman_Start(&Vel_filtered);
   AMT_encoder_init(&AMT, &htim2);
   MOTOR_init(&MT, &htim3,TIM_CHANNEL_2, TIM_CHANNEL_1);
   PID_controller_init(&PID_pos,PID_pos_K[0],PID_pos_K[1],PID_pos_K[2]);
   PID_controller_init(&PID_velo,PID_velo_K[0],PID_velo_K[1],PID_velo_K[3]);
-  kalman_filter_init(&filtered_velo, 0.001,0.6);
+  kalman_filter_init(&filtered_velo, 0.0005,0.6);
   kalman_filter_init(&filtered_accel, 0.002,0.2);
 
   /* USER CODE END 2 */
@@ -901,6 +901,14 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 			if(interrupt_counter % 10 == 0 & emer == 0)
 			{
 				MOTOR_set_duty(&MT, base.MotorHome);
+			}
+			else if(emer == 1)
+			{
+				MOTOR_set_duty(&MT, 0);
+				if(ps2.ps2RX[0] == 78)
+				{
+					emer = 0;
+				}
 			}
 		}
 	}

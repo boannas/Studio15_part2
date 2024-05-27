@@ -101,7 +101,7 @@ void Traject(Trap_Traj* Traj, float Pos_initial, float Pos_final)
 	}
 	if (Time_Velo_const <= 0)
 	{
-		Time_acc_under = sqrt(Distance/Acc_max);
+		Time_acc_under = sqrt(fabs(Distance)/fabs(Acc_max));
 //	            	currentPosition++;
 		if (elapsedTime < Time_acc_under)
 		{

@@ -14,7 +14,7 @@ BaseStruct base;
 extern AMT_Encoder AMT;
 extern MOTOR MT;
 extern u16u8_t registerFrame[200];
-
+extern float temp_pos;
 // Define variable inside library
 int num[10]= {48,49,50,51,52,53,54,55,56,57};
 int count = 0;
@@ -171,6 +171,7 @@ void handle_shelve_mode()
         {
             // Press Start to finish set shelves and send data to basesystem
             base.ShelveMode = 0;
+            temp_pos = AMT.Linear_Position;
         }
     }
 }
