@@ -20,7 +20,7 @@ extern KalmanState filtered_accel;
 int32_t diffPosition;
 uint32_t cnt_per_rev = 8192;
 float cnt_per_rev_f = 8192.0;
-float pulley_cir = 2.0*(22.0/7.0)*12.5;				// millimeter
+float pulley_cir = 2.0*(22.0/7.0)*12.73;				// millimeter
 float diffTime;
 float diffTimeAcc;
 float ALPHA = 0.3f;									// smoothing param

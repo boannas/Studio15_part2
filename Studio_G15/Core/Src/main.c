@@ -55,7 +55,6 @@ TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim4;
 TIM_HandleTypeDef htim5;
-TIM_HandleTypeDef htim6;
 TIM_HandleTypeDef htim16;
 
 UART_HandleTypeDef huart4;
@@ -70,22 +69,20 @@ MOTOR MT;
 Trap_Traj Traj;
 AMT_Encoder AMT;
 PS2_typedef ps2;
-extern PID_struct PID_pos;
+PID_struct PID_pos;
 PID_struct PID_velo;
-extern BaseStruct base;
+BaseStruct base;
 ModbusHandleTypedef hmodbus;
 KalmanState filtered_velo;
 KalmanState filtered_accel;
 
 // Define some variables
-uint64_t _micros;					// Microsecond
-uint8_t fixps2[10];
-float elapsedTime = 0.0f;			// Total elapsed time in seconds
-float i = 0;
-u16u8_t registerFrame[200];
-int emer = 0;
-extern float temp_pos;
-
+extern float temp_pos;								// Reference Position for PID & Traject
+extern int temp_home;
+int emer = 0;										// Emergency state
+uint64_t _micros;									// Microsecond
+u16u8_t registerFrame[200];							// Modbus Weird Datatype
+float elapsedTime;
 
 // Function here!
 uint64_t micros();
@@ -104,7 +101,6 @@ static void MX_UART4_Init(void);
 static void MX_TIM4_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_TIM16_Init(void);
-static void MX_TIM6_Init(void);
 static void MX_ADC1_Init(void);
 /* USER CODE BEGIN PFP */
 
@@ -152,24 +148,15 @@ int main(void)
   MX_TIM4_Init();
   MX_USART2_UART_Init();
   MX_TIM16_Init();
-  MX_TIM6_Init();
   MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
-  HAL_TIM_Base_Start(&htim2);					// AMT Encoder
-  HAL_TIM_Base_Start(&htim3);					// Output compare
-  HAL_TIM_Base_Start(&htim6);					// Trajectory trigger
-  HAL_TIM_PWM_Start_IT(&htim3, TIM_CHANNEL_1);        // PWM
-  HAL_TIM_PWM_Start_IT(&htim3, TIM_CHANNEL_2);        // Direction
-  HAL_TIM_Base_Start_IT(&htim4);
-  HAL_TIM_Base_Start_IT(&htim5);
-  hmodbus.huart = &huart2;
-  hmodbus.htim = &htim16;
-  hmodbus.slaveAddress = 0x15;
-  hmodbus.RegisterSize =200;
-  Modbus_init(&hmodbus, registerFrame);
+  HAL_TIM_Base_Start(&htim2);								// AMT Encoder
+  HAL_TIM_Base_Start(&htim3);								// Motor Output compare
+  HAL_TIM_Base_Start_IT(&htim4);							// System Clock control
+  HAL_TIM_Base_Start_IT(&htim5);							// Microsecond Function
 
-  float PID_pos_K[3] = {12 ,0.002, 0.001};
-  float PID_velo_K[3] = {7.0 ,0.0022, 0.0001};
+
+
 
 
   // Velocity 450 mm/s
@@ -177,15 +164,26 @@ int main(void)
 //  float PID_velo_K[3] = {9 ,0.00002, 0.0};
 
   // Initialize ASRS
-  Traject_init(&Traj,550, 700);				// V_max, A_max
-//  Kalman_Start(&Vel_filtered);
   AMT_encoder_init(&AMT, &htim2);
   MOTOR_init(&MT, &htim3,TIM_CHANNEL_2, TIM_CHANNEL_1);
-  PID_controller_init(&PID_pos,PID_pos_K[0],PID_pos_K[1],PID_pos_K[2]);
-  PID_controller_init(&PID_velo,PID_velo_K[0],PID_velo_K[1],PID_velo_K[3]);
+  hmodbus.huart = &huart2;
+  hmodbus.htim = &htim16;
+  hmodbus.slaveAddress = 0x15;
+  hmodbus.RegisterSize =200;
+  Modbus_init(&hmodbus, registerFrame);
+  //--------------------------Initialize Controller Parameter------------------------------------//
+  // System Max Velocity and Max Acceleration
+  Traject_init(&Traj, 800 , 800);
+  // Constant P I D for Position & Velocity Control
+//  float PID_pos_K[3] = {12 ,0.002, 0.001};
+//  float PID_velo_K[3] = {7.0 ,0.0022, 0.0001};
+    float PID_pos_K[3] = {5 ,0.0000001, 0.000001};
+    float PID_velo_K[3] = {7.0 ,0.0022, 0.0001};
+  // Constant Q R for Kalman Filter in Velocity and Acceleration
   kalman_filter_init(&filtered_velo, 0.0005,0.6);
   kalman_filter_init(&filtered_accel, 0.002,0.2);
-
+  PID_controller_init(&PID_pos,PID_pos_K[0],PID_pos_K[1],PID_pos_K[2]);
+  PID_controller_init(&PID_velo,PID_velo_K[0],PID_velo_K[1],PID_velo_K[3]);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -198,33 +196,26 @@ int main(void)
 
 	  // Feedback to base system 5 Hz
 	  static uint64_t timestamps =0;
-	  if(HAL_GetTick() > timestamps & emer == 0 )
-	  {
+	  if(HAL_GetTick() > timestamps && emer == 0 ){
 		  timestamps =HAL_GetTick() + 100;		//ms
 	  	  Heartbeat();
 	  }
 
-	  // UI & Gripper
+	  // Feedback Status
 	  Vacuum();
 	  GripperMovement();
 	  Modbus_Protocal_Worker();
 	  Routine();
 
-////	  //Ps2
+	  //Ps2
 	  HAL_UART_Receive(&huart4,ps2.ps2RX, 10 ,10);
+
 	  if (base.BaseStatus == 1){
 		  SetShelves();
 	  }
 
-	  if (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_7) == GPIO_PIN_SET)		// Top photo limit was triggered
-	  	{
-		  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, 1);
-		  emer = 1;
-	  	}
-	  else
-	  {
-		  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, 0);
-	  }
+	  // Emergency Button was triggered
+	  emer = (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_7) == GPIO_PIN_SET) ? 1 : emer;
   }
   /* USER CODE END 3 */
 }
@@ -364,7 +355,7 @@ static void MX_TIM2_Init(void)
   htim2.Instance = TIM2;
   htim2.Init.Prescaler = 0;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 65535;
+  htim2.Init.Period = 65534;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   sConfig.EncoderMode = TIM_ENCODERMODE_TI12;
@@ -542,44 +533,6 @@ static void MX_TIM5_Init(void)
   /* USER CODE BEGIN TIM5_Init 2 */
 
   /* USER CODE END TIM5_Init 2 */
-
-}
-
-/**
-  * @brief TIM6 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_TIM6_Init(void)
-{
-
-  /* USER CODE BEGIN TIM6_Init 0 */
-
-  /* USER CODE END TIM6_Init 0 */
-
-  TIM_MasterConfigTypeDef sMasterConfig = {0};
-
-  /* USER CODE BEGIN TIM6_Init 1 */
-
-  /* USER CODE END TIM6_Init 1 */
-  htim6.Instance = TIM6;
-  htim6.Init.Prescaler = 0;
-  htim6.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim6.Init.Period = 65535;
-  htim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_Base_Init(&htim6) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
-  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim6, &sMasterConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN TIM6_Init 2 */
-
-  /* USER CODE END TIM6_Init 2 */
 
 }
 
@@ -805,38 +758,24 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+volatile uint32_t interrupt_counter = 0;			// Interurupt counter
 
-volatile uint32_t interrupt_counter = 0;
-
+// Timer Interrupt
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 	{
-		if(htim == &htim5)
-			{
-			_micros += UINT32_MAX;
-			}
-		if(htim == &htim4)
-		{
+		// Timer 5 Interrupt for Micros()
+		if(htim == &htim5){_micros += UINT32_MAX;}
+
+		// Timer 4 Interrupt for System Clock
+		if(htim == &htim4){
+
 			interrupt_counter++;
 
-
-			// For 20 kHz
-
-			// For 1 kHz
-			//-------For AMT Encoder & Base Status check----------//
-			if(interrupt_counter % 20 == 0)
-			{
-
-			    AMT_encoder_update(&AMT, &htim2, micros());
-
-			}
-
-
-
 			// For 5 KHz
-			//----------------For PID & Traj Condition----------------//
-			if(interrupt_counter % 4 == 0 & emer == 0)
-			{
-				//Modbus
+			//---------------- Check Case & PID & Trajectory ----------------//
+			if(interrupt_counter % 4 == 0 && emer == 0){
+
+				// Check Case From Base System
 				easyCase();
 				switch(base.Base_case){
 					case 1:
@@ -847,12 +786,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 						SetHome();
 						break;
 					case 4:
-						if(base.runJogMode == 0){
-							base.BaseStatus = 4;
-						}
-						else if(base.runJogMode == 1){
-							base.BaseStatus = 8;
-						}
+						base.BaseStatus = (base.runJogMode == 0) ? 4 : ((base.runJogMode == 1) ? 8 : base.BaseStatus);
 						RunJog();
 						break;
 					case 8:
@@ -862,7 +796,6 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 					default :
 						base.BaseStatus = 0;
 						Holding_position();
-
 				}
 
 				// Reed Switch Status
@@ -879,45 +812,42 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 				}
 
 				// Coarse Step Joy
-				if (ps2.mode == 1 & emer == 0){
-					base.MotorHome = ps2.pwmOut;
-					if (ps2.pwmOut < 0)
-					{
-						base.MotorHome = 0;
-					}
-				}
-
+				if (ps2.mode == 1 && emer == 0 && base.ShelveMode == 1) {base.MotorHome = (ps2.pwmOut < 0) ? 0 : ps2.pwmOut;}
 				// Fine Step Joy
-				if (ps2.mode == 2 & emer == 0){
-					PID_controller_cascade(&PID_pos, &PID_velo, &AMT, ps2.PIDPos);
-					base.MotorHome = PID_velo.out;
+				if (ps2.mode == 2 && emer == 0 && base.ShelveMode == 1) {
+				    PID_controller_cascade(&PID_pos, &PID_velo, &AMT, ps2.PIDPos);
+				    base.MotorHome = PID_velo.out;
 				}
 			}
-
-
 
 			// For 2 kHz
-			//------------------For control PWM-------------------//
-			if(interrupt_counter % 10 == 0 & emer == 0)
-			{
+			//---------------------------For control PWM---------------------------//
+			if(interrupt_counter % 10 == 0 && emer == 0){
 				MOTOR_set_duty(&MT, base.MotorHome);
 			}
-			else if(emer == 1)
-			{
+			else if(emer == 1){
 				MOTOR_set_duty(&MT, 0);
-				if(ps2.ps2RX[0] == 78)
-				{
+				base.MotorHome = 0;
+
+				if(ps2.ps2RX[0] == 78){
 					emer = 0;
+					AMT.Linear_Position = 0;
+					PID_pos.out = 0;
+					PID_velo.out = 0;
+					Traj.currentPosition = AMT.Linear_Position;
+					temp_pos = 0;
+					temp_home = 0;
 				}
 			}
+
+			// For 1 kHz
+			//----------------------For AMT Encoder------------------------//
+			if(interrupt_counter % 20 == 0){
+			    AMT_encoder_update(&AMT, &htim2, micros());}
 		}
 	}
 
-uint64_t micros()
-	{
-		return __HAL_TIM_GET_COUNTER(&htim5)+_micros;
-	}
-
+uint64_t micros(){return __HAL_TIM_GET_COUNTER(&htim5)+_micros;}
 
 /* USER CODE END 4 */
 
