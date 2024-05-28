@@ -78,11 +78,14 @@ KalmanState filtered_accel;
 
 // Define some variables
 extern float temp_pos;								// Reference Position for PID & Traject
-extern int temp_home;
+extern int temp_home;								// State Set Home
+extern int temp_cnt;								// RunJog shelves counter
+extern int fuCount;
 int emer = 0;										// Emergency state
 uint64_t _micros;									// Microsecond
-u16u8_t registerFrame[200];							// Modbus Weird Datatype
-float elapsedTime;
+u16u8_t registerFrame[200];							// ModBus Weird thing
+float elapsedTime;									// Trajectory Time Reference
+
 
 // Function here!
 uint64_t micros();
@@ -163,27 +166,31 @@ int main(void)
 //  float PID_pos_K[3] = {17 ,0.002, 0.0001};
 //  float PID_velo_K[3] = {9 ,0.00002, 0.0};
 
-  // Initialize ASRS
-  AMT_encoder_init(&AMT, &htim2);
-  MOTOR_init(&MT, &htim3,TIM_CHANNEL_2, TIM_CHANNEL_1);
-  hmodbus.huart = &huart2;
-  hmodbus.htim = &htim16;
-  hmodbus.slaveAddress = 0x15;
-  hmodbus.RegisterSize =200;
-  Modbus_init(&hmodbus, registerFrame);
-  //--------------------------Initialize Controller Parameter------------------------------------//
-  // System Max Velocity and Max Acceleration
-  Traject_init(&Traj, 800 , 800);
-  // Constant P I D for Position & Velocity Control
-//  float PID_pos_K[3] = {12 ,0.002, 0.001};
-//  float PID_velo_K[3] = {7.0 ,0.0022, 0.0001};
-    float PID_pos_K[3] = {5 ,0.0000001, 0.000001};
-    float PID_velo_K[3] = {7.0 ,0.0022, 0.0001};
-  // Constant Q R for Kalman Filter in Velocity and Acceleration
-  kalman_filter_init(&filtered_velo, 0.0005,0.6);
-  kalman_filter_init(&filtered_accel, 0.002,0.2);
-  PID_controller_init(&PID_pos,PID_pos_K[0],PID_pos_K[1],PID_pos_K[2]);
-  PID_controller_init(&PID_velo,PID_velo_K[0],PID_velo_K[1],PID_velo_K[3]);
+// Initialize ASRS
+	AMT_encoder_init(&AMT, &htim2);
+	MOTOR_init(&MT, &htim3,TIM_CHANNEL_2, TIM_CHANNEL_1);
+	hmodbus.huart = &huart2;
+	hmodbus.htim = &htim16;
+	hmodbus.slaveAddress = 0x15;
+	hmodbus.RegisterSize =200;
+	Modbus_init(&hmodbus, registerFrame);
+	//--------------------------Initialize Controller Parameter------------------------------------//
+
+	// System Max Velocity and Max Acceleration
+	Traject_init(&Traj, 800 , 800);
+
+	// Constant P I D for Position & Velocity Control
+	//  float PID_pos_K[3] = {12 ,0.002, 0.001};
+	//  float PID_velo_K[3] = {7.0 ,0.0022, 0.0001};
+	float PID_pos_K[3] = {7 ,0.00000025, 0.00006};
+	float PID_velo_K[3] = {7.0 ,0.0022, 0.0001};
+	PID_controller_init(&PID_pos,PID_pos_K[0],PID_pos_K[1],PID_pos_K[2]);
+	PID_controller_init(&PID_velo,PID_velo_K[0],PID_velo_K[1],PID_velo_K[3]);
+
+	// Constant Q R for Kalman Filter in Velocity and Acceleration
+	kalman_filter_init(&filtered_velo, 0.0005,0.6);
+	kalman_filter_init(&filtered_accel, 0.002,0.2);
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -194,23 +201,23 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 
-	  // Feedback to base system 5 Hz
+	  // Heartbeat function 5 Hz
 	  static uint64_t timestamps =0;
 	  if(HAL_GetTick() > timestamps && emer == 0 ){
 		  timestamps =HAL_GetTick() + 100;		//ms
 	  	  Heartbeat();
 	  }
 
-	  // Feedback Status
+	  // Feedback to BaseSystem
 	  Vacuum();
 	  GripperMovement();
 	  Modbus_Protocal_Worker();
 	  Routine();
 
-	  //Ps2
+	  // Uart Receive Joystick
 	  HAL_UART_Receive(&huart4,ps2.ps2RX, 10 ,10);
 
-	  if (base.BaseStatus == 1){
+	  if (base.BaseStatus == 1 && emer == 0){
 		  SetShelves();
 	  }
 
@@ -795,7 +802,12 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 						break;
 					default :
 						base.BaseStatus = 0;
-						Holding_position();
+						if(temp_home != 0){
+							Holding_position();
+						}
+						else{
+							base.MotorHome = 0;
+						}
 				}
 
 				// Reed Switch Status
@@ -837,6 +849,9 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 					Traj.currentPosition = AMT.Linear_Position;
 					temp_pos = 0;
 					temp_home = 0;
+					temp_cnt = 0;
+					base.MotorHome = 0;
+					fuCount = 0;
 				}
 			}
 

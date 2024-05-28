@@ -19,6 +19,7 @@
 extern AMT_Encoder AMT;
 extern Trap_Traj Traj;
 extern float elapsedTime;
+extern float x_pos;
 int fuCount = 0;
 extern PID_struct PID_velo, PID_pos;
 extern PS2_typedef ps2;
@@ -59,9 +60,9 @@ void Routine(){
 		registerFrame[0x04].U16 = base.ReedStatus;   					//Gripper status 0b0010 = 0000 0000 0000 0010
 		registerFrame[0x10].U16 = base.BaseStatus;							//Z-axis status 0010 = 1
 		registerFrame[0x11].U16 = AMT.Linear_Position			*10;	//Z-axis position
-		registerFrame[0x12].U16 = fabs(AMT.Linear_Velocity)		*10;	//Z-axis speed
-		registerFrame[0x13].U16 = fabs(AMT.Linear_Acceleration)	*10;	//Z-axis acceleration
-		registerFrame[0x40].U16 = 4								*10;	//X-axis position
+		registerFrame[0x12].U16 = (int)(AMT.Linear_Velocity)		*10;	//Z-axis speed
+		registerFrame[0x13].U16 = (int)(AMT.Linear_Acceleration)	*10;	//Z-axis acceleration
+		registerFrame[0x40].U16 = (int)(x_pos)								*10;	//X-axis position
 	}
 }
 
@@ -157,15 +158,16 @@ void SetHome() {
 		base.MotorHome = PID_velo.out;
 	}
 
-
-    if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_6) == GPIO_PIN_SET) { // Top photo limit was triggered
+	// Top photo limit was triggered
+    if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_6) == GPIO_PIN_SET) {
         AMT_encoder_reset(&AMT); // Reset encoder to zero or the desired home position
+        temp_home = 1;
         elapsedTime = 0;
         Traj.currentPosition = 600;
         base.BaseStatus = 0; // Update the base status
         registerFrame[0x01].U16 = 0;
         registerFrame[0x10].U16 = base.BaseStatus;
-        temp_home = 1;
+
     }
 }
 
@@ -189,7 +191,7 @@ void RunJog() {
 		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5, RESET);			// Vacuum off
 	}
 	if(base.Vacuum == 1){
-		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5, SET);			// Vacuum on
+		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5, SET);				// Vacuum on
 	}
     switch (internalState) {
         case STATE_CASE_4:
@@ -199,20 +201,20 @@ void RunJog() {
                 registerFrame[0x10].U16 = 0;
                 base.MotorHome = 150;
                 internalState = STATE_DELAY_AFTER_4;
-                delayStartTime = HAL_GetTick(); // Record the start time for delay
+                delayStartTime = HAL_GetTick(); 				// Record the start time for delay
                 fuCount = 0;
                 base.Vacuum = 0;
                 break;
             }
 
             // Calculate the target position for picking
-            float pickTarget = base.Shelve[base.Pick[fuCount] - 1] + 4	;
+            float pickTarget = base.Shelve[base.Pick[fuCount] - 1] + 6	;
             elapsedTime += 0.0002;
             Traject(&Traj, temp_pos, pickTarget); // Update trajectory
             PID_controller_cascade(&PID_pos, &PID_velo, &AMT, Traj.currentPosition); // Apply PID control
             base.MotorHome = PID_velo.out;
             // Check if the position is close enough to the target
-            if (fabs(AMT.Linear_Position - pickTarget) < 1) {
+            if (fabs(AMT.Linear_Position - pickTarget) < 1.2) {
             	//Vacuum on
             	base.Vacuum = 1;
             	//Forward
@@ -251,7 +253,7 @@ void RunJog() {
 
         case STATE_CASE_8:
             // Calculate the target position for placing
-            float placeTarget = base.Shelve[base.Place[fuCount] - 1] + 10;
+            float placeTarget = base.Shelve[base.Place[fuCount] - 1] + 15;
             elapsedTime += 0.0002;
             Traject(&Traj, temp_pos, placeTarget); // Update trajectory
             PID_controller_cascade(&PID_pos, &PID_velo, &AMT, Traj.currentPosition); // Apply PID control
@@ -261,7 +263,7 @@ void RunJog() {
             }
             else{base.Vacuum = 0;}
             // Check if the position is close enough to the target
-            if (fabs(AMT.Linear_Position - placeTarget) < 1) {
+            if (fabs(AMT.Linear_Position - placeTarget) < 1.2) {
             	//Forward
             	if(temp_cnt != 1){
             		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4, RESET);
