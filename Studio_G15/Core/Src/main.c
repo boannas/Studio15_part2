@@ -77,12 +77,12 @@ KalmanState filtered_velo;
 KalmanState filtered_accel;
 
 // Define some variables
-extern float temp_pos;								// Reference Position for PID & Traject
+extern float temp_pos;								// Reference Position for PID & Trajectory
 extern int temp_home;								// State Set Home
-extern int temp_cnt;								// RunJog shelves counter
-extern int fuCount;
-int emer = 0;										// Emergency state
-uint64_t _micros;									// Microsecond
+extern int temp_cnt;								// State count in base system
+extern int fuCount;									// RunJog shelves counter
+int emer = 0;										// Emergency state float
+uint64_t _micros;									// Microsecond current time
 u16u8_t registerFrame[200];							// ModBus Weird thing
 float elapsedTime;									// Trajectory Time Reference
 
@@ -177,18 +177,19 @@ int main(void)
 	//--------------------------Initialize Controller Parameter------------------------------------//
 
 	// System Max Velocity and Max Acceleration
-	Traject_init(&Traj, 800 , 800);
+	Traject_init(&Traj, 900 , 1500);
 
 	// Constant P I D for Position & Velocity Control
-	//  float PID_pos_K[3] = {12 ,0.002, 0.001};
-	//  float PID_velo_K[3] = {7.0 ,0.0022, 0.0001};
-	float PID_pos_K[3] = {7 ,0.00000025, 0.00006};
-	float PID_velo_K[3] = {7.0 ,0.0022, 0.0001};
+//	float PID_pos_K[3] = {6.5 ,0.0000001, 0.00006};
+	float PID_pos_K[3] = {12 ,0.00001, 0.0008};
+	float PID_velo_K[3] = {6.5 ,0.0010, 0.00005};
+//	float PID_pos_K[3] = {7 ,0.0002, 0.001};
+//	float PID_velo_K[3] = {7.0 ,0.0022, 0.0001};
 	PID_controller_init(&PID_pos,PID_pos_K[0],PID_pos_K[1],PID_pos_K[2]);
 	PID_controller_init(&PID_velo,PID_velo_K[0],PID_velo_K[1],PID_velo_K[3]);
 
 	// Constant Q R for Kalman Filter in Velocity and Acceleration
-	kalman_filter_init(&filtered_velo, 0.0005,0.6);
+	kalman_filter_init(&filtered_velo, 0.005,0.99);
 	kalman_filter_init(&filtered_accel, 0.002,0.2);
 
   /* USER CODE END 2 */
@@ -201,7 +202,7 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 
-	  // Heartbeat function 5 Hz
+	  // HeartBeat function 5 Hz
 	  static uint64_t timestamps =0;
 	  if(HAL_GetTick() > timestamps && emer == 0 ){
 		  timestamps =HAL_GetTick() + 100;		//ms
@@ -218,6 +219,7 @@ int main(void)
 	  HAL_UART_Receive(&huart4,ps2.ps2RX, 10 ,10);
 
 	  if (base.BaseStatus == 1 && emer == 0){
+		  // Set shelve mode
 		  SetShelves();
 	  }
 
@@ -852,6 +854,10 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 					temp_cnt = 0;
 					base.MotorHome = 0;
 					fuCount = 0;
+					Traj.currentAcceleration = 0.0f;
+					base.BaseStatus = 0;
+					registerFrame[0x01].U16 = 0;
+					registerFrame[0x10].U16 = base.BaseStatus;
 				}
 			}
 

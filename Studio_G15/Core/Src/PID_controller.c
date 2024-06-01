@@ -15,7 +15,6 @@
 extern Trap_Traj Traj;
 
 // Define variable inside library
-float boundary = 0.05;
 
 //-------------------------------------------Function Code-------------------------------------------------------//
 

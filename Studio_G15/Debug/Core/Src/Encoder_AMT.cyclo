@@ -1,4 +1,3 @@
-../Core/Src/Encoder_AMT.c:66:6:AMT_encoder_init	1
-../Core/Src/Encoder_AMT.c:112:6:AMT_encoder_update	4
-../Core/Src/Encoder_AMT.c:162:6:AMT_encoder_reset	1
-../Core/Src/Encoder_AMT.c:169:7:lowPassFilter	1
+../Core/Src/Encoder_AMT.c:32:6:AMT_encoder_init	1
+../Core/Src/Encoder_AMT.c:40:6:AMT_encoder_update	4
+../Core/Src/Encoder_AMT.c:91:6:AMT_encoder_reset	1

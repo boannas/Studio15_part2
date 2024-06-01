@@ -23,12 +23,6 @@ int num[10]= {48,49,50,51,52,53,54,55,56,57};
 int count = 0;
 float x_pos = 0;
 
-// Function Prototypes
-void PS2_init(PS2_typedef* PS2);
-void PS2X_Reader();
-void handle_shelve_mode();
-void handle_PIDPos_adjustment();
-
 //-------------------------------------------Function Code-------------------------------------------------------//
 
 void PS2_init(PS2_typedef* PS2)

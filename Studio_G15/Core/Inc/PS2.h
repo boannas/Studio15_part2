@@ -29,7 +29,10 @@ typedef struct
 	} PS2_typedef;
 extern PS2_typedef ps2;
 
+// Function Prototypes
+void PS2_init(PS2_typedef* PS2);
 void PS2X_Reader();
-void PS2_init();
+void handle_shelve_mode();
+void handle_PIDPos_adjustment();
 
 #endif /* INC_PS2_H_ */

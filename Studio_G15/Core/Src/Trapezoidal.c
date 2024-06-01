@@ -47,20 +47,15 @@ void Traject(Trap_Traj* Traj, float Pos_initial, float Pos_final)
 	Time_acc = Traj->Velo_max / Traj->Accel_max;
 	Time_dec = Time_acc;
 
-	if (Distance >0)
-	{
+	if (Distance >0){
 	  Acc_max = Traj->Accel_max;
 	  Vel_max = Traj->Velo_max;
-
 	}
-	else if(Distance < 0)
-	{
+	else if(Distance < 0){
 	  Acc_max = -Traj->Accel_max;
 	  Vel_max = -Traj->Velo_max;
-
 	}
-	else
-	{
+	else{
 	  // No movement required
 	  Traj->currentAcceleration = 0;
 	  Traj->currentVelocity = 0;
@@ -77,8 +72,7 @@ void Traject(Trap_Traj* Traj, float Pos_initial, float Pos_final)
 
 	if(Time_Velo_const >0)
 	{
-	  if (elapsedTime < Time_acc)
-	  {
+	  if (elapsedTime < Time_acc){
 		  // Acceleration phase
 		  Traj->currentAcceleration = Acc_max;
 		  Traj->currentVelocity = Acc_max * elapsedTime;
@@ -86,16 +80,14 @@ void Traject(Trap_Traj* Traj, float Pos_initial, float Pos_final)
 		  temp_pos_acc = Traj->currentPosition;
 		  temp_pos_const = Traj->currentPosition;
 	  }
-	  else if (elapsedTime < time_ref1)
-	  {
+	  else if (elapsedTime < time_ref1){
 		  // Constant velocity phase
 		  Traj->currentAcceleration = 0;
 		  Traj->currentVelocity = Vel_max;
 		  Traj->currentPosition = (Vel_max * (elapsedTime-Time_acc)) + temp_pos_acc;
 		  temp_pos_const = Traj->currentPosition;
 	  }
-	  else if (elapsedTime < time_ref2)
-	  {
+	  else if (elapsedTime < time_ref2){
 		  // Deceleration phase
 		  Traj->currentAcceleration = -Acc_max;
 		  Traj->currentVelocity = -(Acc_max * (elapsedTime-time_ref1)) + Vel_max;
@@ -111,22 +103,19 @@ void Traject(Trap_Traj* Traj, float Pos_initial, float Pos_final)
 	if (Time_Velo_const <= 0)
 	{
 	  Time_acc_under = sqrt(fabs(Distance)/fabs(Acc_max));
-	  if (elapsedTime < Time_acc_under)
-	  {
+	  if (elapsedTime < Time_acc_under){
 		  Traj->currentAcceleration = Acc_max;
 		  Traj->currentVelocity = Acc_max * elapsedTime;
 		  Traj->currentPosition = Pos_initial + 0.5f * Acc_max * elapsedTime * elapsedTime;
 		  temp_pos_acc = Traj->currentPosition;
 		  temp_velo_acc = Traj->currentVelocity;
 	  }
-	  else if (elapsedTime < 2 * Time_acc_under)
-	  {
+	  else if (elapsedTime < 2 * Time_acc_under){
 		  Traj->currentAcceleration = -Acc_max;
 		  Traj->currentVelocity = temp_velo_acc - Acc_max*(elapsedTime-Time_acc_under);
 		  Traj->currentPosition = temp_pos_acc + Traj->currentVelocity *(elapsedTime-Time_acc_under)+(0.5f*Acc_max*(elapsedTime-Time_acc_under)*(elapsedTime-Time_acc_under));
 	  }
-	  else
-	  {
+	  else{
 		  Traj->currentAcceleration = 0.0f;
 		  Traj->currentVelocity = 0.0f;
 		  Traj->currentPosition = Pos_final;

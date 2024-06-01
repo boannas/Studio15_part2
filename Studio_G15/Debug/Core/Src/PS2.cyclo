@@ -1,4 +1,4 @@
-../Core/Src/PS2.c:34:6:PS2_init	1
-../Core/Src/PS2.c:145:6:PS2X_Reader	17
-../Core/Src/PS2.c:219:6:handle_shelve_mode	8
-../Core/Src/PS2.c:250:6:handle_PIDPos_adjustment	4
+../Core/Src/PS2.c:28:6:PS2_init	1
+../Core/Src/PS2.c:139:6:PS2X_Reader	17
+../Core/Src/PS2.c:213:6:handle_shelve_mode	8
+../Core/Src/PS2.c:244:6:handle_PIDPos_adjustment	4
